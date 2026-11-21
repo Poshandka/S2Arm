@@ -13,6 +13,7 @@
 #include "direct/sha256.h"
 #include "direct/jv.h"
 #include "nvn_dirty.h"
+#include "compiler_cli.h"
 #include <spawn.h>
 #include <sys/wait.h>
 extern char **environ;
@@ -99,13 +100,14 @@ int s2a_direct_provider_compile_context(struct s2a_direct_compile_context *c) {
 static int32_t compiled_result(uint64_t session, uint64_t generation, s2a_direct_bytes req, s2a_direct_emit_fn emit, void *sink) {
     compile_calls++;
     if (session != 4 || generation != 6) return -1;
-    char req_path[1024], out_dir[1024], result_path[1024];
+    char req_path[1024], out_dir[1024], result_path[1024], cli_dll[1280];
+    if (s2a_test_compiler_cli(case_dir, cli_dll, sizeof cli_dll)) return -1;
     snprintf(req_path, sizeof req_path, "%s/core-request.json", case_dir);
     snprintf(out_dir, sizeof out_dir, "%s/core-compiler", case_dir);
     snprintf(result_path, sizeof result_path, "%s/core-compiler/program.json", case_dir);
     FILE *f = fopen(req_path, "wb"); if (!f) return -1;
     if (fwrite(req.data, 1, (size_t)req.bytes, f) != (size_t)req.bytes || fclose(f)) return -1;
-    char *const argv[] = {"dotnet", "/src/graphics/tools/direct/compiler/cli/bin/Release/net10.0/S2A.DirectCompiler.Cli.dll",
+    char *const argv[] = {"dotnet", cli_dll,
                           "compile", "--request", req_path, "--output", out_dir, NULL};
     pid_t pid; int status = 0;
     if (posix_spawnp(&pid, "dotnet", NULL, NULL, argv, environ) || waitpid(pid, &status, 0) != pid ||
