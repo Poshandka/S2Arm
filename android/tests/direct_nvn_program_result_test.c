@@ -225,7 +225,7 @@ int main(void) {
             { ",\"c0Reads\":[[1604]]", "", -1, 0, 0, "single-element range is rejected" },
         };
         for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
-            char json[1024]; char msg[192];
+            char json[1024]; char msg[512];
             int n = snprintf(json, sizeof json,
                 "{\"schema\":\"s2a-direct-program-v1\",\"content\":{"
                 "\"stages\":[{\"stage\":\"vs\",\"spirv\":\"%s\"%s},{\"stage\":\"fs\",\"spirv\":\"%s\"%s}],"
