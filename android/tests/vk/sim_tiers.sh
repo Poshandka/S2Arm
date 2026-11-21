@@ -10,7 +10,7 @@
 # 环境：
 #   S2A_VK_PROFILE_LAYER_DIR  已构建好的 profiles 层目录（含 VkLayer_khronos_profiles.json）；不给就按下面钉的版本构建
 #   S2A_VK_PROFILES_CACHE     构建目录（默认 ${XDG_CACHE_HOME:-~/.cache}/s2arm/vk-profiles-<版本>）
-#   S2A_SIM_SHARD             k/n，只跑所选档位中序号 % n == k 的档。基线只在第 0 片跑。
+#   S2A_SIM_SHARD             k/n，基线序号为 0，所选档位从 1 编号。各片跑序号 % n == k 的用例。
 # 退出码：0 全部符合期望；1 有档不符（测试失败）；75 环境不齐（缺系统包 / 层构建不出来），不记成测试失败。
 set -euo pipefail
 
@@ -32,8 +32,8 @@ if [ -n "${S2A_SIM_SHARD:-}" ]; then
         echo "S2A_SIM_SHARD 要写成 k/n（0 <= k < n）：${S2A_SIM_SHARD}" >&2; exit 64
     fi
     picked=()
-    for i in "${!want[@]}"; do [ $((i % shard_n)) -ne "$shard_k" ] || picked+=("${want[$i]}"); done
-    want=("${picked[@]}")
+    for i in "${!want[@]}"; do [ $(((i + 1) % shard_n)) -ne "$shard_k" ] || picked+=("${want[$i]}"); done
+    want=(${picked[@]+"${picked[@]}"})
     [ "$shard_k" -eq 0 ] || run_baseline=0
     echo "分片 ${shard_k}/${shard_n}：基线$([ "$run_baseline" -eq 1 ] && echo 跑 || echo 不跑)，档 ${want[*]:-（无）}"
 fi

@@ -31,14 +31,14 @@ concurrency:
   cancel-in-progress: true
 jobs:
   contract-sim:
-    # 各档运行整套 run.sh。把档位分给四个作业，避免串行超时。
-    name: contract-sim (${{ matrix.shard }}/4)
+    # 基线和 11 个模拟档各跑一份完整的 run.sh。
+    name: contract-sim (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -51,7 +51,7 @@ jobs:
             build-essential git cmake ninja-build libjsoncpp-dev python3-jsonschema python3-pyparsing
       - name: 契约测试 + 模拟机型档
         env:
-          S2A_SIM_SHARD: ${{ matrix.shard }}/4
+          S2A_SIM_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
         run: |
           set +e
           bash android/tests/vk/sim_tiers.sh
