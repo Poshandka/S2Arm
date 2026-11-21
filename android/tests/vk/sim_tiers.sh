@@ -10,6 +10,7 @@
 # 环境：
 #   S2A_VK_PROFILE_LAYER_DIR  已构建好的 profiles 层目录（含 VkLayer_khronos_profiles.json）；不给就按下面钉的版本构建
 #   S2A_VK_PROFILES_CACHE     构建目录（默认 ${XDG_CACHE_HOME:-~/.cache}/s2arm/vk-profiles-<版本>）
+#   S2A_SIM_SHARD             k/n，基线序号为 0，所选档位从 1 编号。各片跑序号 % n == k 的用例。
 # 退出码：0 全部符合期望；1 有档不符（测试失败）；75 环境不齐（缺系统包 / 层构建不出来），不记成测试失败。
 set -euo pipefail
 
@@ -24,6 +25,18 @@ want=("$@"); [ ${#want[@]} -gt 0 ] || want=("${all[@]}")
 for t in "${want[@]}"; do
     case " ${all[*]} " in *" $t "*) ;; *) echo "未知档：${t}（可用：${all[*]}）" >&2; exit 64 ;; esac
 done
+run_baseline=1
+if [ -n "${S2A_SIM_SHARD:-}" ]; then
+    shard_k=${S2A_SIM_SHARD%/*}; shard_n=${S2A_SIM_SHARD#*/}
+    if ! [[ "$shard_k" =~ ^[0-9]+$ && "$shard_n" =~ ^[1-9][0-9]*$ ]] || ! [ "$shard_k" -lt "$shard_n" ]; then
+        echo "S2A_SIM_SHARD 要写成 k/n（0 <= k < n）：${S2A_SIM_SHARD}" >&2; exit 64
+    fi
+    picked=()
+    for i in "${!want[@]}"; do [ $(((i + 1) % shard_n)) -ne "$shard_k" ] || picked+=("${want[$i]}"); done
+    want=(${picked[@]+"${picked[@]}"})
+    [ "$shard_k" -eq 0 ] || run_baseline=0
+    echo "分片 ${shard_k}/${shard_n}：基线$([ "$run_baseline" -eq 1 ] && echo 跑 || echo 不跑)，档 ${want[*]:-（无）}"
+fi
 
 env_missing() { echo "【环境不齐】$*" >&2; exit 75; }
 
@@ -172,17 +185,19 @@ check_tier() {
 }
 
 
-start=$SECONDS; before=$fails
-rc=0; run_tier "" "$out/baseline.log" || rc=$?
-if [ "$rc" -eq 2 ] && grep -q "找不到" "$out/baseline.log"; then
-    cat "$out/baseline.log" >&2; env_missing "run.sh 找不到依赖（见上）"
+if [ "$run_baseline" -eq 1 ]; then
+    start=$SECONDS; before=$fails
+    rc=0; run_tier "" "$out/baseline.log" || rc=$?
+    if [ "$rc" -eq 2 ] && grep -q "找不到" "$out/baseline.log"; then
+        cat "$out/baseline.log" >&2; env_missing "run.sh 找不到依赖（见上）"
+    fi
+    if [ "$rc" -ne 0 ]; then red 基线 "run.sh rc=$rc"; tail -40 "$out/baseline.log" >&2; else echo "【绿】基线（不挂层，$((SECONDS - start))s）"; fi
 fi
-if [ "$rc" -ne 0 ]; then red 基线 "run.sh rc=$rc"; tail -40 "$out/baseline.log" >&2; else echo "【绿】基线（不挂层，$((SECONDS - start))s）"; fi
 
-for tier in "${want[@]}"; do
+for tier in ${want[@]+"${want[@]}"}; do
     start=$SECONDS; before=$fails
     check_tier "$tier"
 done
 
 if [ "$fails" -ne 0 ]; then echo "【红】模拟机型档：$fails 处不符" >&2; exit 1; fi
-echo "【绿】模拟机型档：基线 + ${want[*]} 全部符合期望（profiles 层 ${profiles_sha:0:12}）"
+echo "【绿】模拟机型档：$([ "$run_baseline" -eq 1 ] && echo '基线 + ')${want[*]:-（本片无档）} 全部符合期望（profiles 层 ${profiles_sha:0:12}）"
