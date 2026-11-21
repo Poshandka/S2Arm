@@ -28,6 +28,8 @@ concurrency:
 
 jobs:
   deploy:
+    # 推送时只在已启用 Pages 的仓库自动发布。手动运行会照常检查发布源。
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.repository.has_pages }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
